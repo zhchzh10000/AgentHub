@@ -28,6 +28,7 @@ function reviveChatGroupDates(group: ChatGroup): ChatGroup {
   return {
     ...group,
     createdAt: new Date(group.createdAt),
+    lastSummaryTime: group.lastSummaryTime ? new Date(group.lastSummaryTime) : undefined,
     messages: group.messages?.map(reviveMessageDates) ?? [],
     lastMessage: group.lastMessage ? reviveMessageDates(group.lastMessage) : undefined,
   };

@@ -15,20 +15,11 @@ interface ChatWindowProps {
 
 export function ChatWindow({ group, agents, onSendMessage, onAgentReply }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
-  const [autoDiscuss, setAutoDiscuss] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [group.messages]);
-
-  useEffect(() => {
-    if (!autoDiscuss) return;
-    const timer = setInterval(() => {
-      onAgentReply();
-    }, 8000);
-    return () => clearInterval(timer);
-  }, [autoDiscuss, onAgentReply]);
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
@@ -144,15 +135,7 @@ export function ChatWindow({ group, agents, onSendMessage, onAgentReply }: ChatW
             variant="outline"
             className="text-xs"
           >
-            🤖 触发Agent讨论
-          </Button>
-          <Button
-            onClick={() => setAutoDiscuss((v) => !v)}
-            size="sm"
-            variant={autoDiscuss ? 'destructive' : 'outline'}
-            className="text-xs"
-          >
-            {autoDiscuss ? '⏹ 停止持续讨论' : '▶ 开启持续讨论'}
+            🤖 推进一轮讨论
           </Button>
         </div>
         <div className="flex items-center gap-2">

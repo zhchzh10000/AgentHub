@@ -9,13 +9,14 @@ import { ArrowLeft, FileText, Calendar, MessageSquare, CheckCircle, ArrowRight }
 import { format } from 'date-fns';
 
 export function Summaries() {
-  const { project } = useProject();
+  const { project, isProjectLoading } = useProject();
   const navigate = useNavigate();
 
-  if (!project) {
+  if (!project && !isProjectLoading) {
     navigate('/');
     return null;
   }
+  if (isProjectLoading || !project) return null;
 
   const sortedSummaries = [...(project.summaries || [])].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()

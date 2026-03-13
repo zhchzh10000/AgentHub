@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Project, Agent, ChatGroup, Message, Milestone, Summary, SummarySettings, Task, SkillExecution, AIModel } from '../types';
 import { updateAgentModel as apiUpdateAgentModel, updateAgentStatus as apiUpdateAgentStatus } from '../api/agentApi';
+import { getProject } from '../api/projectApi';
 
 interface ProjectContextType {
   project: Project | null;
+  isProjectLoading: boolean;
   setProject: (project: Project | null) => void;
   addAgent: (agent: Agent) => void;
   addChatGroup: (group: ChatGroup) => void;
@@ -24,11 +26,51 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [project, setProject] = useState<Project | null>(null);
+  const [isProjectLoading, setIsProjectLoading] = useState(true);
   const [summarySettings, setSummarySettings] = useState<SummarySettings>({
     timeInterval: 10, // 默认10分钟
     messageInterval: 10, // 默认10轮
     enabled: true,
   });
+
+  useEffect(() => {
+    const savedProjectId = window.localStorage.getItem('agenthub.activeProjectId');
+    if (!savedProjectId) {
+      setIsProjectLoading(false);
+      return;
+    }
+
+    getProject(savedProjectId)
+      .then((savedProject) => {
+        setProject(savedProject);
+        setSummarySettings(savedProject.summarySettings);
+      })
+      .catch(() => {
+        window.localStorage.removeItem('agenthub.activeProjectId');
+      })
+      .finally(() => {
+        setIsProjectLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!project?.id) return;
+
+    window.localStorage.setItem('agenthub.activeProjectId', project.id);
+    setSummarySettings(project.summarySettings);
+
+    const timer = window.setInterval(async () => {
+      try {
+        const latest = await getProject(project.id);
+        setProject(latest);
+        setSummarySettings(latest.summarySettings);
+      } catch (error) {
+        console.error('Failed to refresh project state', error);
+      }
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [project?.id]);
 
   const addAgent = (agent: Agent) => {
     if (!project) return;
@@ -167,6 +209,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     <ProjectContext.Provider
       value={{
         project,
+        isProjectLoading,
         setProject,
         addAgent,
         addChatGroup,

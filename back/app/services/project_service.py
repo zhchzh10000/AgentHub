@@ -5,7 +5,7 @@ from typing import List
 from uuid import uuid4
 import os
 
-from ..models import AIModel, Agent, ChatGroup, Message, Project
+from ..models import AIModel, Agent, AgentMemory, ChatGroup, Message, Project
 from ..store import STORE
 
 
@@ -182,11 +182,16 @@ def generate_team_for_project(project_id: str) -> Project:
         createdAt=_now(),
         purpose="主要工作讨论群",
         messageCount=1,
+        lastSummaryTime=welcome_message.timestamp,
+        lastSummaryMessageCount=1,
     )
 
     project.agents = agents
     project.chatGroups = [main_group]
     project.status = "in-progress"
+    project.agentMemories = {
+        agent.id: AgentMemory(agentId=agent.id, updatedAt=_now()) for agent in agents
+    }
 
     STORE.update_project(project)
     return project

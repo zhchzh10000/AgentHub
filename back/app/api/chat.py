@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..models import ChatGroup, Message, Project
-from ..services import chat_service, model_service
+from ..services import chat_service, discussion_service, model_service
 
 
 router = APIRouter()
@@ -87,11 +87,15 @@ async def pm_handle_task(project_id: str, group_id: str, payload: PmHandleTaskRe
     用户在群里发送任务后，由项目经理和其他成员使用真实大模型进行自动回复。
     """
     try:
-        return await model_service.pm_handle_user_task(
+        project = await model_service.pm_handle_user_task(
             project_id=project_id,
             group_id=group_id,
             user_message_id=payload.userMessageId,
         )
+        group = next((item for item in project.chatGroups if item.id == group_id), None)
+        if group and group.autoCollaborationEnabled:
+            discussion_service.ensure_discussion_loop(project_id, group_id)
+        return project
     except ValueError as exc:
         msg = str(exc)
         if "Project not found" in msg:
@@ -123,7 +127,12 @@ async def continue_discussion(project_id: str, group_id: str) -> Project:
 @router.post("/{project_id}/chat/groups/{group_id}/auto-collaboration", response_model=ChatGroup)
 def set_auto_collaboration(project_id: str, group_id: str, payload: AutoCollaborationRequest) -> ChatGroup:
     try:
-        return chat_service.set_auto_collaboration(project_id=project_id, group_id=group_id, enabled=payload.enabled)
+        group = chat_service.set_auto_collaboration(project_id=project_id, group_id=group_id, enabled=payload.enabled)
+        if payload.enabled and len(group.messages) > 1 and group.lastMessage and group.lastMessage.senderId != "user":
+            discussion_service.ensure_discussion_loop(project_id, group_id)
+        else:
+            discussion_service.stop_discussion_loop(project_id, group_id)
+        return group
     except ValueError as exc:
         msg = str(exc)
         if "Project not found" in msg:

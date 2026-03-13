@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -18,6 +18,12 @@ export function SummarySettingsDialog({ open, onOpenChange, settings, onSave }: 
   const [timeInterval, setTimeInterval] = useState(settings.timeInterval);
   const [messageInterval, setMessageInterval] = useState(settings.messageInterval);
   const [enabled, setEnabled] = useState(settings.enabled);
+
+  useEffect(() => {
+    setTimeInterval(settings.timeInterval);
+    setMessageInterval(settings.messageInterval);
+    setEnabled(settings.enabled);
+  }, [settings, open]);
 
   const handleSave = () => {
     onSave({

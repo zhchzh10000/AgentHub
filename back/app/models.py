@@ -83,6 +83,13 @@ class Agent(BaseModel):
     workload: Optional[int] = None
 
 
+class AgentMemory(BaseModel):
+    agentId: str
+    rollingSummary: str = ""
+    recentEvents: list[str] = Field(default_factory=list)
+    updatedAt: datetime
+
+
 class Milestone(BaseModel):
     id: str
     title: str
@@ -127,6 +134,7 @@ class Project(BaseModel):
     summaries: list[Summary] = Field(default_factory=list)
     tasks: list[Task] = Field(default_factory=list)
     skillExecutions: list[SkillExecution] = Field(default_factory=list)
+    agentMemories: dict[str, AgentMemory] = Field(default_factory=dict)
     summarySettings: SummarySettings = Field(
         default_factory=lambda: SummarySettings(timeInterval=10, messageInterval=10, enabled=True)
     )

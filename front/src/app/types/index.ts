@@ -104,6 +104,8 @@ export interface ChatGroup {
   purpose: string;
   messageCount?: number; // 用于追踪消息数量
   autoCollaborationEnabled?: boolean;
+  lastSummaryTime?: Date;
+  lastSummaryMessageCount?: number;
 }
 
 // 项目类型定义
@@ -119,6 +121,7 @@ export interface Project {
   summaries: Summary[];
   tasks: Task[];
   skillExecutions: SkillExecution[];
+  summarySettings: SummarySettings;
 }
 
 // 里程碑类型定义

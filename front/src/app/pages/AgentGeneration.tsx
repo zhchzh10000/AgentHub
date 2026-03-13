@@ -10,7 +10,7 @@ import { generateTeam } from '../api/projectApi';
 import { Loader2, CheckCircle2, Users, MessageSquare, ArrowRight } from 'lucide-react';
 
 export function AgentGeneration() {
-  const { project, setProject } = useProject();
+  const { project, isProjectLoading, setProject } = useProject();
   const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -19,6 +19,9 @@ export function AgentGeneration() {
   const hasInitialized = useRef(false);
 
   useEffect(() => {
+    if (isProjectLoading) {
+      return;
+    }
     if (!project) {
       navigate('/');
       return;
@@ -201,13 +204,13 @@ export function AgentGeneration() {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [project, navigate, setProject]);
+  }, [project, isProjectLoading, navigate, setProject]);
 
   const handleStartCollaboration = () => {
     navigate('/chat');
   };
 
-  if (!project) return null;
+  if (isProjectLoading || !project) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">

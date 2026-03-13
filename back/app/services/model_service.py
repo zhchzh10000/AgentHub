@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import httpx
 
+from . import chat_service
 from .project_service import _now  # reuse timestamp helper
 from ..models import Agent, Message, Project
 from ..store import STORE
@@ -52,13 +53,26 @@ def _get_project_and_group(project_id: str, group_id: str) -> tuple[Project, Ite
 
 
 def _append_messages(project: Project, group_id: str, messages: list[Message]) -> Project:
-    group = next(g for g in project.chatGroups if g.id == group_id)
-    group.messages.extend(messages)
-    if messages:
-        group.lastMessage = messages[-1]
-        group.messageCount = (group.messageCount or 0) + len(messages)
-    STORE.update_project(project)
-    return project
+    return chat_service.append_messages_to_group(project, group_id, messages)
+
+
+def _build_agent_memory_context(project: Project, agent_id: str, recent_messages: list[Message]) -> str:
+    memory = project.agentMemories.get(agent_id)
+    rolling_summary = memory.rollingSummary if memory else ""
+    recent_events = "\n".join(f"- {event}" for event in (memory.recentEvents[-10:] if memory else []))
+    latest_messages = "\n".join(
+        f"- {message.senderName}: {message.content}" for message in recent_messages[-10:]
+    )
+    recent_summaries = "\n".join(
+        f"- {summary.content}" for summary in project.summaries[-3:]
+    )
+
+    return (
+        f"历史滚动摘要：\n{rolling_summary or '暂无'}\n\n"
+        f"最近记忆窗口：\n{recent_events or '暂无'}\n\n"
+        f"最近消息原文：\n{latest_messages or '暂无'}\n\n"
+        f"最近阶段总结：\n{recent_summaries or '暂无'}"
+    )
 
 
 async def pm_handle_user_task(project_id: str, group_id: str, user_message_id: str) -> Project:
@@ -79,8 +93,8 @@ async def pm_handle_user_task(project_id: str, group_id: str, user_message_id: s
         raise ValueError("User message not found")
 
     # 构造上下文：最近若干条消息 + 当前任务
-    recent_contents = [m.content for m in list(messages)[-10:]]
-    context_text = "\n".join(f"- {c}" for c in recent_contents)
+    message_list = list(messages)
+    context_text = _build_agent_memory_context(project, pm_agent.id, message_list)
 
     system_prompt = (
         "你是一个软件项目的智能项目经理，负责理解用户提出的任务，并为团队成员分解和分配工作。"
@@ -118,6 +132,7 @@ async def pm_handle_user_task(project_id: str, group_id: str, user_message_id: s
         )
         member_user = (
             f"项目目标：{project.goal}\n\n"
+            f"你掌握的历史上下文：\n{_build_agent_memory_context(project, agent.id, message_list)}\n\n"
             f"项目经理在群里的最新说明如下：\n{pm_reply}\n\n"
             "请用简洁的方式说明你会如何推进与你相关的子任务，可以包含 1-3 个具体步骤。"
         )
@@ -152,8 +167,8 @@ async def continue_group_discussion(project_id: str, group_id: str) -> Project:
     if pm_agent is None:
         raise ValueError("Project manager not found")
 
-    recent_contents = [m.content for m in list(messages)[-8:]]
-    context_text = "\n".join(f"- {c}" for c in recent_contents)
+    message_list = list(messages)
+    context_text = _build_agent_memory_context(project, pm_agent.id, message_list)
     system_prompt = (
         "你是一个软件项目的智能项目经理。"
         "请基于团队刚才的讨论，继续推进任务，指出当前最值得继续细化的 1-2 个点，"
@@ -184,6 +199,7 @@ async def continue_group_discussion(project_id: str, group_id: str) -> Project:
         )
         member_user = (
             f"项目目标：{project.goal}\n\n"
+            f"你掌握的历史上下文：\n{_build_agent_memory_context(project, agent.id, message_list)}\n\n"
             f"最近讨论：\n{context_text}\n\n"
             f"项目经理刚刚的新发言：\n{pm_reply}\n\n"
             "请简洁回复，推进讨论。"

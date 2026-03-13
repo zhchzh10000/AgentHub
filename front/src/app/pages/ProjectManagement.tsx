@@ -19,13 +19,14 @@ import {
 } from 'lucide-react';
 
 export function ProjectManagement() {
-  const { project } = useProject();
+  const { project, isProjectLoading } = useProject();
   const navigate = useNavigate();
 
-  if (!project) {
+  if (!project && !isProjectLoading) {
     navigate('/');
     return null;
   }
+  if (isProjectLoading || !project) return null;
 
   const projectManager = project.agents.find(a => a.isProjectManager);
 

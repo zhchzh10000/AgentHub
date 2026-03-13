@@ -16,17 +16,18 @@ import { createTask as createTaskApi } from '../api/taskApi';
 import { getProject } from '../api/projectApi';
 
 export function Chat() {
-  const { project, setProject, addChatGroup, summarySettings, updateSummarySettings, updateAgentModel } = useProject();
+  const { project, isProjectLoading, setProject, addChatGroup, summarySettings, updateSummarySettings, updateAgentModel } = useProject();
   const navigate = useNavigate();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isTaskAssignDialogOpen, setIsTaskAssignDialogOpen] = useState(false);
   const [isAgentListDialogOpen, setIsAgentListDialogOpen] = useState(false);
-  const [discussionLoopActive, setDiscussionLoopActive] = useState(false);
-  const [discussionRequestInFlight, setDiscussionRequestInFlight] = useState(false);
 
   useEffect(() => {
+    if (isProjectLoading) {
+      return;
+    }
     if (!project) {
       navigate('/');
       return;
@@ -35,7 +36,7 @@ export function Chat() {
     if (project.chatGroups.length > 0 && !selectedGroupId) {
       setSelectedGroupId(project.chatGroups[0].id);
     }
-  }, [project, navigate, selectedGroupId]);
+  }, [project, isProjectLoading, navigate, selectedGroupId]);
 
   const handleSendMessage = (content: string) => {
     if (!selectedGroupId || !project) return;
@@ -55,7 +56,6 @@ export function Chat() {
             userMessageId: userMessage.id,
           });
           setProject(updatedProject);
-          setDiscussionLoopActive(true);
         } else {
           const updated = await refreshProject(project.id);
           setProject(updated);
@@ -66,77 +66,13 @@ export function Chat() {
     })();
   };
 
-  useEffect(() => {
-    if (!project || !selectedGroupId || !discussionLoopActive || discussionRequestInFlight) return;
-
-    const currentGroup = project.chatGroups.find(g => g.id === selectedGroupId);
-    if (!currentGroup?.autoCollaborationEnabled) {
-      setDiscussionLoopActive(false);
-      return;
-    }
-
-    if (!currentGroup.lastMessage || currentGroup.lastMessage.senderId === 'user') return;
-
-    setDiscussionRequestInFlight(true);
-    (async () => {
-      try {
-        const updatedProject = await continueDiscussion(project.id, selectedGroupId);
-        setProject(updatedProject);
-      } catch (error) {
-        setDiscussionLoopActive(false);
-      } finally {
-        setDiscussionRequestInFlight(false);
-      }
-    })();
-  }, [project, selectedGroupId, discussionLoopActive, discussionRequestInFlight, setProject]);
-
   const handleAgentReply = () => {
     if (!selectedGroupId || !project) return;
 
     (async () => {
       try {
-        const pmAgent = project.agents.find(a => a.isProjectManager);
-        const pmTasks = (project.tasks || []).filter(task => {
-          if (!pmAgent) return false;
-          return task.assignedTo === pmAgent.id && task.status === 'assigned';
-        });
-
-        const agentsToReply = project.agents.filter(a => !a.isProjectManager);
-
-        for (const agent of agentsToReply) {
-          const directlyAssignedTasks = (project.tasks || []).filter(task => {
-            if (task.assignedTo !== agent.id) return false;
-            if (pmAgent && task.assignedBy !== pmAgent.id) return false;
-            return task.status === 'assigned';
-          });
-
-          const usePmTasks = directlyAssignedTasks.length === 0 && pmTasks.length > 0;
-          const relatedTasks = usePmTasks ? pmTasks : directlyAssignedTasks;
-          const hasTasks = relatedTasks.length > 0;
-
-          const tasksDescription = hasTasks
-            ? relatedTasks
-                .map(task => `【${task.title}】 - ${task.description}`)
-                .join('\n')
-            : '目前没有新的指派任务，我会持续关注项目进展。';
-
-          const content = hasTasks
-            ? usePmTasks
-              ? `根据项目经理当前的总体任务规划，我将从「${agent.role}」的角度参与以下工作：\n${tasksDescription}`
-              : `收到项目经理的指派，我将负责以下任务：\n${tasksDescription}`
-            : tasksDescription;
-
-          await sendMessageApi(project.id, selectedGroupId, {
-            senderId: agent.id,
-            senderName: agent.name,
-            senderAvatar: agent.avatar,
-            content,
-            type: 'text',
-          });
-        }
-
-        const updated = await refreshProject(project.id);
-        setProject(updated);
+        const updatedProject = await continueDiscussion(project.id, selectedGroupId);
+        setProject(updatedProject);
       } catch (error) {
         console.error('Failed to trigger agent reply', error);
       }
@@ -161,7 +97,7 @@ export function Chat() {
     })();
   };
 
-  if (!project) return null;
+  if (isProjectLoading || !project) return null;
 
   const selectedGroup = project.chatGroups.find(g => g.id === selectedGroupId);
 
@@ -224,9 +160,6 @@ export function Chat() {
                       group.id === selectedGroupId ? updatedGroup : group
                     ),
                   });
-                  if (!nextEnabled) {
-                    setDiscussionLoopActive(false);
-                  }
                 } catch (error) {
                   console.error('Failed to toggle auto collaboration', error);
                 }
@@ -278,7 +211,7 @@ export function Chat() {
       <SummarySettingsDialog
         open={isSettingsDialogOpen}
         onOpenChange={setIsSettingsDialogOpen}
-        settings={summarySettings}
+        settings={project.summarySettings ?? summarySettings}
         onSave={(settings) => {
           if (!project) return;
           (async () => {
