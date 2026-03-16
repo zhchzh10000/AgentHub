@@ -38,6 +38,24 @@ def _format_message_brief(message: Message, limit: int = 90) -> str:
     return f"{message.senderName}：{_truncate(message.content, limit)}"
 
 
+def _format_message_detail(message: Message) -> str:
+    return f"{message.senderName}：{_normalize_text(message.content)}"
+
+
+def _extract_plan_candidates(messages: list[Message]) -> list[str]:
+    candidates: list[str] = []
+    plan_keywords = ("方案", "建议", "采用", "实现", "设计", "架构", "布局", "接口", "拆分")
+
+    for message in messages:
+        normalized = _normalize_text(message.content)
+        if not normalized:
+            continue
+        if any(keyword in normalized for keyword in plan_keywords):
+            candidates.append(_format_message_detail(message))
+
+    return _dedupe_preserve_order(candidates)
+
+
 def _ensure_agent_memory(project: Project, agent_id: str) -> AgentMemory:
     memory = project.agentMemories.get(agent_id)
     if memory is None:
@@ -88,22 +106,32 @@ def _build_summary(project: Project, group: ChatGroup, messages_slice: list[Mess
         (message for message in reversed(relevant_messages) if message.senderId == "user"),
         None,
     )
-    topic = _truncate(latest_user_message.content, 60) if latest_user_message else _truncate(project.goal, 60)
+    topic = _normalize_text(latest_user_message.content) if latest_user_message else _normalize_text(project.goal)
     participants = "、".join(
         _dedupe_preserve_order([message.senderName for message in relevant_messages])
     )
     key_points = _dedupe_preserve_order(
-        [_format_message_brief(message) for message in relevant_messages[-5:]]
-    )[:5]
+        [_format_message_detail(message) for message in relevant_messages[-10:]]
+    )[:10]
+
+    viewpoint_messages = [
+        message for message in relevant_messages if message.senderId != "user" and message.type == "text"
+    ]
+    viewpoints = _dedupe_preserve_order(
+        [_format_message_detail(message) for message in viewpoint_messages[-8:]]
+    )[:8]
+    plan_candidates = _extract_plan_candidates(viewpoint_messages)
+    plan_a = plan_candidates[0] if len(plan_candidates) >= 1 else None
+    plan_b = plan_candidates[1] if len(plan_candidates) >= 2 else None
 
     decision_keywords = ("决定", "确认", "采用", "优先", "先", "分配", "安排", "负责")
     decisions = _dedupe_preserve_order(
         [
-            _format_message_brief(message)
+            _format_message_detail(message)
             for message in relevant_messages
             if any(keyword in message.content for keyword in decision_keywords)
         ]
-    )[:3]
+    )[:6]
     if not decisions:
         pm_messages = [
             message
@@ -111,27 +139,39 @@ def _build_summary(project: Project, group: ChatGroup, messages_slice: list[Mess
             if "项目经理" in message.senderName or message.senderId != "user"
         ]
         decisions = _dedupe_preserve_order(
-            [_format_message_brief(message) for message in pm_messages[:2]]
-        )[:2]
+            [_format_message_detail(message) for message in pm_messages[:4]]
+        )[:4]
 
     next_step_keywords = ("下一步", "接下来", "计划", "将", "需要", "推进", "跟进", "完成")
     next_steps = _dedupe_preserve_order(
         [
-            _format_message_brief(message)
+            _format_message_detail(message)
             for message in relevant_messages
             if any(keyword in message.content for keyword in next_step_keywords)
         ]
-    )[:3]
+    )[:6]
     if not next_steps:
         next_steps = _dedupe_preserve_order(
-            [_format_message_brief(message) for message in relevant_messages[-3:]]
-        )[:3]
+            [_format_message_detail(message) for message in relevant_messages[-5:]]
+        )[:5]
 
     start_index = group.lastSummaryMessageCount + 1
     end_index = group.lastSummaryMessageCount + len(messages_slice)
     summary_lines = [
         f"本轮围绕“{topic}”展开了 {len(relevant_messages)} 条讨论，参与成员包括：{participants}。",
     ]
+    if key_points:
+        summary_lines.append("讨论中提到的核心技术点与关键信息：")
+        summary_lines.extend(f"- {item}" for item in key_points)
+    if plan_a:
+        summary_lines.append("方案A：")
+        summary_lines.append(f"- {plan_a}")
+    if plan_b:
+        summary_lines.append("方案B：")
+        summary_lines.append(f"- {plan_b}")
+    if viewpoints:
+        summary_lines.append("各位成员提出的主要观点与方案：")
+        summary_lines.extend(f"- {item}" for item in viewpoints)
     if decisions:
         summary_lines.append("当前已经形成的主要结论如下：")
         summary_lines.extend(f"- {item}" for item in decisions)
