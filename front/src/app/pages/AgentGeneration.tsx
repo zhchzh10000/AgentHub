@@ -128,12 +128,15 @@ export function AgentGeneration() {
 
     let backendProject: typeof project | null = null;
 
-    const runNextStep = () => {
-      if (currentStepIndex < steps.length) {
-        const { progress: prog, step, delay } = steps[currentStepIndex];
-        setProgress(prog);
-        setCurrentStep(step);
+    const goal = project?.goal ?? '';
 
+    const runNextStep = () => {
+      if (currentStepIndex >= steps.length) return;
+      const { progress: prog, step, delay } = steps[currentStepIndex];
+      setProgress(prog);
+      setCurrentStep(step);
+
+      try {
         if (prog === 60) {
           // 生成项目经理
           const pmAgent: Agent = {
@@ -148,8 +151,8 @@ export function AgentGeneration() {
           };
           setGeneratedAgents([pmAgent]);
         } else if (prog === 80) {
-          // 根据项目目标生成其他Agent
-          const agents = generateAgentsBasedOnGoal(project.goal);
+          // 根据项目目标生成其他Agent（使用安全 goal，避免报错卡住进度）
+          const agents = generateAgentsBasedOnGoal(goal);
           setGeneratedAgents((prev) => [...prev, ...agents]);
         } else if (prog === 100) {
           // 生成完成，优先使用后端返回的真实项目数据
@@ -169,7 +172,7 @@ export function AgentGeneration() {
               isProjectManager: true,
             };
 
-            const allAgents = [pmAgent, ...generateAgentsBasedOnGoal(project.goal)];
+            const allAgents = [pmAgent, ...generateAgentsBasedOnGoal(goal)];
             setGeneratedAgents(allAgents);
             setProject({
               ...project,
@@ -184,8 +187,12 @@ export function AgentGeneration() {
             setIsGenerating(false);
           }, 500);
         }
+      } catch (e) {
+        console.error('Agent generation step error', e);
+      }
 
-        currentStepIndex++;
+      currentStepIndex++;
+      if (currentStepIndex < steps.length) {
         timeoutId = setTimeout(runNextStep, delay);
       }
     };

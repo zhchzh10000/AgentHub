@@ -1,11 +1,23 @@
 
-  # 智能项目管理平台
+  # 前端应用说明（AgentHub Frontend）
 
-  This is a code bundle for 智能项目管理平台. The original project is available at https://www.figma.com/design/3jnnn3D7zYhEXJZg0bCwYp/%E6%99%BA%E8%83%BD%E9%A1%B9%E7%9B%AE%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0.
+  本目录为 **AgentHub 智能项目管理平台的前端代码**，基于 React + Vite + TypeScript 开发。
 
-  ## Running the code
+  用户可以：
 
-  Run `npm i` to install the dependencies.
+  - 在首页输入项目目标，让系统自动生成包含项目经理、前端、后端等角色的 AI 团队；
+  - 在首页下方查看 **历史创建的团队**，一键进入对应项目的管理与协作页面；
+  - 在聊天页发起任务讨论，开启 / 结束自动协作，由 PM 带领多角色自动往下推进；
+  - 在总结页查看按轮次生成的 **会议纪要式讨论总结**，聚焦每轮的核心方案和实施步骤。
 
-  Run `npm run dev` to start the development server.
-  
+  ## 本地启动
+
+  ```bash
+  # 安装依赖
+  npm install
+
+  # 启动开发服务（默认使用 README 根目录中推荐的端口配置）
+  npm run dev
+  ```
+
+  启动后，按照根目录 `README.md` 中的说明，确保后端 FastAPI 服务已运行并配置好接口地址，即可在浏览器中体验完整的项目创建、团队生成、聊天协作与总结功能。

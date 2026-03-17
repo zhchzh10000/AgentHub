@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -13,6 +15,31 @@ router = APIRouter()
 
 class CreateProjectRequest(BaseModel):
     goal: str
+
+
+class ProjectListItem(BaseModel):
+    id: str
+    goal: str
+    status: str
+    progress: int
+    createdAt: datetime
+    agentCount: int
+
+
+@router.get("", response_model=list[ProjectListItem])
+def list_projects() -> list[ProjectListItem]:
+    projects = STORE.list_projects()
+    return [
+        ProjectListItem(
+            id=p.id,
+            goal=p.goal,
+            status=p.status,
+            progress=p.progress,
+            createdAt=p.createdAt,
+            agentCount=len(p.agents),
+        )
+        for p in projects
+    ]
 
 
 @router.post("", response_model=Project)

@@ -157,27 +157,34 @@ def _build_summary(project: Project, group: ChatGroup, messages_slice: list[Mess
 
     start_index = group.lastSummaryMessageCount + 1
     end_index = group.lastSummaryMessageCount + len(messages_slice)
-    summary_lines = [
-        f"本轮围绕“{topic}”展开了 {len(relevant_messages)} 条讨论，参与成员包括：{participants}。",
-    ]
-    if key_points:
-        summary_lines.append("讨论中提到的核心技术点与关键信息：")
-        summary_lines.extend(f"- {item}" for item in key_points)
+
+    # 会议纪要风格：只保留本轮核心方案和执行步骤，避免长篇复述
+    summary_lines = [f"主题：{topic}（消息 {start_index}-{end_index}）", "一、核心方案 / 方法："]
+
+    core_methods: list[str] = []
     if plan_a:
-        summary_lines.append("方案A：")
-        summary_lines.append(f"- {plan_a}")
+        core_methods.append(plan_a)
     if plan_b:
-        summary_lines.append("方案B：")
-        summary_lines.append(f"- {plan_b}")
-    if viewpoints:
-        summary_lines.append("各位成员提出的主要观点与方案：")
-        summary_lines.extend(f"- {item}" for item in viewpoints)
-    if decisions:
-        summary_lines.append("当前已经形成的主要结论如下：")
-        summary_lines.extend(f"- {item}" for item in decisions)
+        core_methods.append(plan_b)
+    if not core_methods:
+        core_methods = key_points[:5]
+
+    if core_methods:
+        summary_lines.extend(f"- {item}" for item in core_methods)
+    else:
+        summary_lines.append("- （本轮暂无明确方案，更多是背景讨论）")
+
+    summary_lines.append("二、实现步骤 / 执行动作：")
+    core_steps: list[str] = []
     if next_steps:
-        summary_lines.append("建议继续按以下方向推进：")
-        summary_lines.extend(f"- {item}" for item in next_steps)
+        core_steps.extend(next_steps[:5])
+    if decisions:
+        core_steps.extend(decisions[:3])
+
+    if core_steps:
+        summary_lines.extend(f"- {item}" for item in core_steps[:8])
+    else:
+        summary_lines.append("- （本轮暂无明确后续步骤）")
 
     return Summary(
         id=str(uuid4()),

@@ -11,9 +11,10 @@ interface ChatWindowProps {
   agents: Agent[];
   onSendMessage: (content: string) => void;
   onAgentReply: () => void;
+  onToggleAutoCollaboration: () => void;
 }
 
-export function ChatWindow({ group, agents, onSendMessage, onAgentReply }: ChatWindowProps) {
+export function ChatWindow({ group, agents, onSendMessage, onAgentReply, onToggleAutoCollaboration }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +137,14 @@ export function ChatWindow({ group, agents, onSendMessage, onAgentReply }: ChatW
             className="text-xs"
           >
             🤖 推进一轮讨论
+          </Button>
+          <Button
+            onClick={onToggleAutoCollaboration}
+            size="sm"
+            variant={group.autoCollaborationEnabled ?? true ? 'destructive' : 'outline'}
+            className="text-xs"
+          >
+            {group.autoCollaborationEnabled ?? true ? '结束本轮自动讨论' : '开启自动协作'}
           </Button>
         </div>
         <div className="flex items-center gap-2">

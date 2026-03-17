@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Card } from '../components/ui/card';
 import { useProject } from '../context/ProjectContext';
-import { Sparkles, Target, Users } from 'lucide-react';
-import { createProject } from '../api/projectApi';
+import { Sparkles, Target, Users, History } from 'lucide-react';
+import { createProject, listProjects, getProject } from '../api/projectApi';
+import type { ProjectListItem } from '../api/projectApi';
 
 export function Home() {
   const [goal, setGoal] = useState('');
+  const [historyList, setHistoryList] = useState<ProjectListItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const navigate = useNavigate();
   const { setProject } = useProject();
+
+  useEffect(() => {
+    listProjects()
+      .then(setHistoryList)
+      .catch(() => setHistoryList([]))
+      .finally(() => setHistoryLoading(false));
+  }, []);
 
   const handleSubmit = async () => {
     if (!goal.trim()) return;
@@ -24,6 +34,25 @@ export function Home() {
       // Phase 1: 简单控制台报错，后续可接入全局通知
     }
   };
+
+  const handleEnterProject = async (item: ProjectListItem) => {
+    try {
+      const project = await getProject(item.id);
+      setProject(project);
+      navigate('/project');
+    } catch (error) {
+      console.error('Failed to load project', error);
+    }
+  };
+
+  const statusLabel = (s: string) =>
+    s === 'completed' ? '已完成' : s === 'in-progress' ? '进行中' : '规划中';
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
@@ -86,6 +115,55 @@ export function Home() {
             </Button>
           </div>
         </Card>
+
+        {/* 历史创建的团队 */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <History className="w-5 h-5 text-gray-600" />
+            历史创建的团队
+          </h2>
+          {historyLoading ? (
+            <p className="text-sm text-gray-500">加载中...</p>
+          ) : historyList.length === 0 ? (
+            <p className="text-sm text-gray-500">暂无历史团队</p>
+          ) : (
+            <ul className="space-y-2">
+              {historyList.map((item) => (
+                <li key={item.id}>
+                  <Card
+                    className="p-4 cursor-pointer border-2 border-gray-100 hover:border-blue-300 transition-colors"
+                    onClick={() => handleEnterProject(item)}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-base font-medium text-gray-900 line-clamp-2 flex-1 min-w-0">
+                        {item.goal}
+                      </p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            item.status === 'completed'
+                              ? 'bg-green-100 text-green-700'
+                              : item.status === 'in-progress'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {statusLabel(item.status)}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {item.agentCount} 人 · 进度 {item.progress}%
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {formatDate(item.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* 示例提示 */}
         <div className="mt-8 text-center">

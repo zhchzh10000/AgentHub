@@ -1,6 +1,15 @@
 import { Project, ChatGroup, Message } from '../types';
 import { request } from './client';
 
+export interface ProjectListItem {
+  id: string;
+  goal: string;
+  status: string;
+  progress: number;
+  createdAt: string;
+  agentCount: number;
+}
+
 function reviveMessageDates(message: Message): Message {
   return {
     ...message,
@@ -77,5 +86,9 @@ export async function generateTeam(projectId: string): Promise<Project> {
 export async function getProject(projectId: string): Promise<Project> {
   const data = await request<Project>(`/projects/${projectId}`);
   return reviveProjectDates(data);
+}
+
+export async function listProjects(): Promise<ProjectListItem[]> {
+  return request<ProjectListItem[]>('/projects');
 }
 

@@ -38,6 +38,24 @@ export function Chat() {
     }
   }, [project, isProjectLoading, navigate, selectedGroupId]);
 
+  const toggleAutoCollaboration = () => {
+    if (!project || !selectedGroupId || !selectedGroup) return;
+    const nextEnabled = !selectedGroup.autoCollaborationEnabled;
+    (async () => {
+      try {
+        const updatedGroup = await setAutoCollaborationApi(project.id, selectedGroupId, { enabled: nextEnabled });
+        setProject({
+          ...project,
+          chatGroups: project.chatGroups.map(group =>
+            group.id === selectedGroupId ? updatedGroup : group
+          ),
+        });
+      } catch (error) {
+        console.error('Failed to toggle auto collaboration', error);
+      }
+    })();
+  };
+
   const handleSendMessage = (content: string) => {
     if (!selectedGroupId || !project) return;
 
@@ -148,23 +166,7 @@ export function Chat() {
           <Button
             variant={(selectedGroup?.autoCollaborationEnabled ?? true) ? 'destructive' : 'outline'}
             size="sm"
-            onClick={() => {
-              if (!project || !selectedGroupId || !selectedGroup) return;
-              const nextEnabled = !selectedGroup.autoCollaborationEnabled;
-              (async () => {
-                try {
-                  const updatedGroup = await setAutoCollaborationApi(project.id, selectedGroupId, { enabled: nextEnabled });
-                  setProject({
-                    ...project,
-                    chatGroups: project.chatGroups.map(group =>
-                      group.id === selectedGroupId ? updatedGroup : group
-                    ),
-                  });
-                } catch (error) {
-                  console.error('Failed to toggle auto collaboration', error);
-                }
-              })();
-            }}
+            onClick={toggleAutoCollaboration}
           >
             {(selectedGroup?.autoCollaborationEnabled ?? true) ? '停止自动协作' : '开启自动协作'}
           </Button>
@@ -190,6 +192,7 @@ export function Chat() {
               agents={project.agents}
               onSendMessage={handleSendMessage}
               onAgentReply={handleAgentReply}
+              onToggleAutoCollaboration={toggleAutoCollaboration}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-gray-500">
